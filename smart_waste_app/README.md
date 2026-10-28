@@ -1,6 +1,6 @@
 # Smart Waste Classification using Computer Vision
 
-Course: Deep Learning (ADCOR1PC301) · TYAIDS-03 · Tanmay Badhe & Swayam Netke
+Course: Deep Learning (ADCOR1PC301) · TYAIDS · Tanmay Badhe (Roll No: 3) & Swayam Netke (Roll No: 33)
 
 A simple end-to-end version of the microproject: **model → backend → frontend**.
 
