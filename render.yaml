@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: smart-waste-classifier
+    env: python
+    rootDir: smart_waste_app
+    buildCommand: pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && pip install --no-cache-dir -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: free
