@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Waste Classifier</title>
+<style>
+  :root{--navy:#1e3660;--blue:#3e6aa0;--bg:#f4f7fb;--card:#fff;--line:#d9e2ee;--ok:#1b7f4b;--warn:#b45309;--text:#1b2433;--muted:#5b6778}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  header{background:var(--navy);color:#fff;padding:18px 20px}
+  header h1{margin:0;font-size:1.25rem}
+  header p{margin:4px 0 0;font-size:.85rem;opacity:.85}
+  main{max-width:880px;margin:20px auto;padding:0 16px;display:grid;gap:16px;grid-template-columns:1fr 1fr}
+  @media(max-width:720px){main{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  h2{font-size:1rem;margin:0 0 12px;color:var(--navy)}
+  #drop{border:2px dashed var(--blue);border-radius:10px;min-height:240px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);cursor:pointer;overflow:hidden;background:#fafcff}
+  #drop.over{background:#eaf2fb}
+  #drop img{max-width:100%;max-height:300px;display:block}
+  .row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
+  button{font:inherit;border:0;border-radius:8px;padding:10px 16px;cursor:pointer;background:var(--blue);color:#fff;font-weight:600}
+  button.secondary{background:#e6edf6;color:var(--navy)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  label.chk{font-size:.9rem;color:var(--muted);display:flex;gap:6px;align-items:center}
+  .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:.8rem;font-weight:700}
+  .badge.ok{background:#dff3e8;color:var(--ok)} .badge.warn{background:#fdecd2;color:var(--warn)}
+  .big{font-size:1.8rem;font-weight:700;text-transform:capitalize;margin:8px 0 2px}
+  .muted{color:var(--muted);font-size:.9rem}
+  .bar{display:grid;grid-template-columns:90px 1fr 54px;gap:8px;align-items:center;margin:6px 0;font-size:.9rem}
+  .track{background:#e8eef6;border-radius:6px;height:12px;overflow:hidden} .fill{height:100%;background:var(--blue)}
+  #cam{max-width:100%;border-radius:8px;margin-top:10px;display:none}
+  #status{font-size:.85rem;margin:10px 0 0;color:var(--muted)}
+  #err{color:#b91c1c;font-size:.9rem;margin-top:8px;display:none}
+  footer{max-width:880px;margin:0 auto 24px;padding:0 16px;font-size:.8rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Smart Waste Classification using Computer Vision</h1>
+  <p>MobileNetV3-Large · six TrashNet classes: cardboard, glass, metal, paper, plastic, trash</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>1. Upload a photo of one waste item</h2>
+    <div id="drop" tabindex="0" role="button" aria-label="Choose or drop an image">
+      <span id="hint">Click, drag &amp; drop, or use the camera button</span>
+    </div>
+    <input id="file" type="file" accept="image/*" hidden>
+    <input id="camfile" type="file" accept="image/*" capture="environment" hidden>
+    <div class="row">
+      <button class="secondary" id="pick">Choose image</button>
+      <button class="secondary" id="cam">Use camera</button>
+      <button id="go" disabled>Classify</button>
+    </div>
+    <div class="row"><label class="chk"><input type="checkbox" id="explain"> Show Grad-CAM heatmap</label></div>
+    <div id="err"></div>
+    <p id="status">Checking model…</p>
+  </section>
+
+  <section class="card" id="result" aria-live="polite">
+    <h2>2. Result</h2>
+    <p class="muted" id="empty">No result yet.</p>
+    <div id="out" style="display:none">
+      <span class="badge" id="decision"></span>
+      <div class="big" id="label"></div>
+      <div class="muted" id="conf"></div>
+      <p><strong>Sorting stream:</strong> <span id="stream"></span></p>
+      <p class="muted" id="msg"></p>
+      <h2 style="margin-top:14px">Top-3 probabilities</h2>
+      <div id="bars"></div>
+      <div id="cam-wrap" style="display:none"><h2 style="margin-top:14px">Grad-CAM</h2><img id="camimg" alt="Grad-CAM heatmap" style="max-width:100%;border-radius:8px"></div>
+    </div>
+  </section>
+</main>
+<footer>
+  Prototype trained on TrashNet (single, clearly visible items). Predictions below the 0.90 confidence threshold are sent to manual review.
+  Not validated on real smart-bin hardware or cluttered, real-world waste.
+</footer>
+
+<script>
+const $=id=>document.getElementById(id); let current=null;
+const show=(el,v)=>el.style.display=v?'':'none';
+function setFile(f){
+  if(!f) return; if(!f.type.startsWith('image/')){return err('Please choose an image file.');}
+  current=f; err(''); const r=new FileReader();
+  r.onload=e=>{$('drop').innerHTML='<img alt="Selected waste item" src="'+e.target.result+'">'};
+  r.readAsDataURL(f); $('go').disabled=false;
+}
+function err(m){$('err').textContent=m;show($('err'),!!m)}
+$('pick').onclick=()=>$('file').click(); $('cam').onclick=()=>$('camfile').click();
+$('drop').onclick=()=>$('file').click(); $('drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' ')$('file').click()};
+$('file').onchange=e=>setFile(e.target.files[0]); $('camfile').onchange=e=>setFile(e.target.files[0]);
+['dragover','dragenter'].forEach(t=>$('drop').addEventListener(t,e=>{e.preventDefault();$('drop').classList.add('over')}));
+['dragleave','drop'].forEach(t=>$('drop').addEventListener(t,e=>{e.preventDefault();$('drop').classList.remove('over')}));
+$('drop').addEventListener('drop',e=>setFile(e.dataTransfer.files[0]));
+
+$('go').onclick=async()=>{
+  if(!current) return; $('go').disabled=true; $('go').textContent='Classifying…'; err('');
+  const fd=new FormData(); fd.append('file',current);
+  try{
+    const r=await fetch('/predict?explain='+$('explain').checked,{method:'POST',body:fd});
+    const j=await r.json(); if(!r.ok) throw new Error(j.detail||'Request failed');
+    render(j);
+  }catch(e){err(e.message)}
+  $('go').disabled=false; $('go').textContent='Classify';
+};
+function render(j){
+  show($('empty'),false); show($('out'),true);
+  const ok=j.decision==='auto_sort';
+  $('decision').textContent=ok?'Auto-sort':'Manual review'; $('decision').className='badge '+(ok?'ok':'warn');
+  $('label').textContent=j.label; $('conf').textContent='Confidence '+(j.confidence*100).toFixed(1)+'% (threshold '+(j.threshold*100).toFixed(0)+'%)';
+  $('stream').textContent=ok?j.stream:j.stream+' — suggested: '+j.suggested_stream; $('msg').textContent=j.message;
+  $('bars').innerHTML=j.top3.map(t=>'<div class="bar"><span>'+t.label+'</span><div class="track"><div class="fill" style="width:'+(t.probability*100)+'%"></div></div><span>'+(t.probability*100).toFixed(1)+'%</span></div>').join('');
+  if(j.gradcam_png_base64){$('camimg').src='data:image/png;base64,'+j.gradcam_png_base64;show($('cam-wrap'),true)}else show($('cam-wrap'),false);
+}
+fetch('/health').then(r=>r.json()).then(h=>{
+  $('status').textContent=h.model_loaded?'Model ready.':'Model not loaded: '+(h.error||'unknown error');
+  if(!h.model_loaded) $('status').style.color='#b91c1c';
+}).catch(()=>{$('status').textContent='Cannot reach the server.';});
+</script>
+</body>
+</html>
