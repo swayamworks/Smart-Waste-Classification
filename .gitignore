@@ -18,7 +18,8 @@ Thumbs.db
 .vscode/
 *.swp
 
-# Model files (too large for GitHub without LFS)
+# Model files
 *.pt
 *.onnx
 *.pth
+!smart_waste_app/models/mobilenetv3_large_trashnet.pt
